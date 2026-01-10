@@ -12,7 +12,18 @@ local LocalPlayer = Players.LocalPlayer
 local VercelUrl = "https://webhook-rose-nu.vercel.app/api/forward.js"
 local Library = require(ReplicatedStorage:WaitForChild("Library"))
 
---// 2. CONFIG
+--// 2. EXECUTOR REQUEST FINDER
+local function getRequest()
+    return request 
+        or (syn and syn.request) 
+        or http_request 
+        or (http and http.request) 
+        or (fluxus and fluxus.request) 
+        or (httpx and httpx.request) 
+        or nil
+end
+
+--// 3. CONFIG
 local Config = {
     Enabled = false,
     Webhook = "", 
@@ -25,7 +36,7 @@ local Config = {
     }
 }
 
---// 3. UTILITIES
+--// 4. UTILITIES
 local function toSuffix(n)
     if n >= 1e9 then return string.format("%.2fB", n / 1e9)
     elseif n >= 1e6 then return string.format("%.2fM", n / 1e6)
@@ -44,27 +55,46 @@ local function parseNumber(text)
     return math.floor(num)
 end
 
---// 4. WEBHOOK & SNIPER
+--// 5. IMPROVED WEBHOOK SENDER
 local function SendWebhook(title, item, price, cat)
     if Config.Webhook == "" then return end
-    pcall(function()
-        local payload = {
-            ["webhook"] = Config.Webhook,
-            ["content"] = "@everyone",
-            ["embeds"] = {{
-                ["title"] = title,
-                ["color"] = 65420,
-                ["fields"] = {
-                    {["name"] = "Item", ["value"] = item, ["inline"] = true},
-                    {["name"] = "Price", ["value"] = toSuffix(price), ["inline"] = true},
-                    {["name"] = "Type", ["value"] = cat, ["inline"] = true}
-                }
-            }}
-        }
-        HttpService:PostAsync(VercelUrl, HttpService:JSONEncode(payload))
-    end)
+    
+    local execRequest = getRequest()
+    local payload = HttpService:JSONEncode({
+        ["webhook"] = Config.Webhook, -- Vercel proxy requirement
+        ["content"] = "@everyone",
+        ["embeds"] = {{
+            ["title"] = title,
+            ["color"] = 65420,
+            ["fields"] = {
+                {["name"] = "Item", ["value"] = item, ["inline"] = true},
+                {["name"] = "Price", ["value"] = toSuffix(price), ["inline"] = true},
+                {["name"] = "Type", ["value"] = cat, ["inline"] = true},
+                {["name"] = "User", ["value"] = LocalPlayer.Name, ["inline"] = false}
+            },
+            ["footer"] = {["text"] = "NulsHub Sniper | V9"}
+        }}
+    })
+
+    if execRequest then
+        -- Use Executor's special request function
+        task.spawn(function()
+            execRequest({
+                Url = VercelUrl,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = payload
+            })
+        end)
+    else
+        -- Fallback to standard HttpService (Only works if HttpEnabled is ON)
+        pcall(function()
+            HttpService:PostAsync(VercelUrl, payload)
+        end)
+    end
 end
 
+--// 6. SNIPER LOGIC
 local function TryBuy(listingUID, price, itemData, sellerId)
     if not Config.Enabled then return end
     local itemId = itemData.id
@@ -76,7 +106,7 @@ local function TryBuy(listingUID, price, itemData, sellerId)
 
     if petData.titanic and price <= Config.MaxGems.Titanic then buy = true cat = "Titanic"
     elseif petData.huge and price <= Config.MaxGems.Huge then buy = true cat = "Huge"
-    elseif petData.exclusiveLevel and price <= Config.MaxGems.ExclusiveLevel then buy = true cat = "Exclusive Lvl"
+    elseif petData.exclusiveLevel and price <= Config.MaxGems.ExclusiveLevel then buy = true cat = "Excl Lvl"
     elseif string.find(itemId, "Exclusive") and price <= Config.MaxGems.Exclusive then buy = true cat = "Exclusive"
     end
 
@@ -84,13 +114,12 @@ local function TryBuy(listingUID, price, itemData, sellerId)
         task.spawn(function()
             local success = ReplicatedStorage.Network.Booths_RequestPurchase:InvokeServer(tostring(sellerId), listingUID)
             if success then
-                SendWebhook("🚀 Item Sniped!", itemId, price, cat)
+                SendWebhook("🚀 Successful Snipe!", itemId, price, cat)
             end
         end)
     end
 end
 
--- Fixed Listener
 ReplicatedStorage.Network.Booths_Broadcast.OnClientEvent:Connect(function(sellerId, data)
     if not Config.Enabled or type(data) ~= "table" or not data.Listings then return end
     for uid, info in pairs(data.Listings) do
@@ -100,9 +129,9 @@ ReplicatedStorage.Network.Booths_Broadcast.OnClientEvent:Connect(function(seller
     end
 end)
 
---// 5. UI SETUP
-if CoreGui:FindFirstChild("NulsHubV8") then CoreGui.NulsHubV8:Destroy() end
-local ScreenGui = Instance.new("ScreenGui", CoreGui); ScreenGui.Name = "NulsHubV8"
+--// 7. UI CONSTRUCTION
+if CoreGui:FindFirstChild("NulsHubV9") then CoreGui.NulsHubV9:Destroy() end
+local ScreenGui = Instance.new("ScreenGui", CoreGui); ScreenGui.Name = "NulsHubV9"
 
 local function SmoothDrag(obj)
     local dragging, dragInput, dragStart, startPos
@@ -123,7 +152,7 @@ end
 
 local Main = Instance.new("Frame", ScreenGui)
 Main.Size = UDim2.new(0, 420, 0, 280); Main.Position = UDim2.new(0.5, -210, 0.5, -140); Main.BackgroundColor3 = Color3.fromRGB(15,15,15); Main.BorderSizePixel = 0; Main.Visible = true
-Instance.new("UICorner", Main)
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
 SmoothDrag(Main)
 
 local Title = Instance.new("TextLabel", Main)
@@ -166,11 +195,11 @@ end
 AddInp("Huge Max", "Huge"); AddInp("Titanic Max", "Titanic"); AddInp("Excl Max", "Exclusive")
 
 -- Discord
-local DiscI = Instance.new("TextBox", Discord); DiscI.Size = UDim2.new(1, 0, 0, 40); DiscI.PlaceholderText = "Paste Webhook Here"; DiscI.Text = ""; DiscI.BackgroundColor3 = Color3.fromRGB(25,25,25); DiscI.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", DiscI)
+local DiscI = Instance.new("TextBox", Discord); DiscI.Size = UDim2.new(1, 0, 0, 40); DiscI.PlaceholderText = "Paste Webhook URL Here"; DiscI.Text = ""; DiscI.BackgroundColor3 = Color3.fromRGB(25,25,25); DiscI.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", DiscI)
 DiscI.FocusLost:Connect(function() Config.Webhook = DiscI.Text end)
 
 local TestBtn = Instance.new("TextButton", Discord); TestBtn.Size = UDim2.new(1,0,0,40); TestBtn.Position = UDim2.new(0,0,0,50); TestBtn.BackgroundColor3 = Color3.fromRGB(0,120,200); TestBtn.Text = "TEST WEBHOOK"; TestBtn.Font = Enum.Font.GothamBold; TestBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", TestBtn)
-TestBtn.MouseButton1Click:Connect(function() SendWebhook("✅ Test Message", "NulsHub V8", 0, "Test") end)
+TestBtn.MouseButton1Click:Connect(function() SendWebhook("✅ Test Message", "NulsHub Connection Check", 0, "Test") end)
 
 -- Floating Button
 local Float = Instance.new("TextButton", ScreenGui); Float.Size = UDim2.new(0, 60, 0, 60); Float.Position = UDim2.new(0.9, 0, 0.1, 0); Float.BackgroundColor3 = Color3.fromRGB(20, 20, 20); Float.Text = "NULS"; Float.TextColor3 = Color3.fromRGB(0, 255, 140); Float.Font = Enum.Font.GothamBlack; Float.TextScaled = true; Instance.new("UICorner", Float).CornerRadius = UDim.new(1,0)
