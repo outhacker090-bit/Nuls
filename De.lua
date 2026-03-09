@@ -29,22 +29,27 @@ local function createPart(name, size, offset, color, material, rotation)
     return p
 end
 
--- Create flag with connected 45° symbol
-local function makeFlag()
-    -- Clear previous parts
-    for _, v in pairs(character:GetChildren()) do
-        if v:IsA("BasePart") or v:IsA("Accessory") then
-            v:Destroy()
+-- Hide original body parts
+local function hideCharacter()
+    for _, part in pairs(character:GetChildren()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            part.Transparency = 1
+            part.CanCollide = false
         end
     end
+end
 
-    local flagWidth = 12
-    local flagHeight = 8
-    local thickness = 0.3
-    local armThickness = 1
-    local armLength = 3.5 -- length of each arm from center
+-- Morph character into the flag
+local function makeFlag()
+    hideCharacter()
 
-    -- Red flag
+    local flagWidth = 20 -- bigger than player
+    local flagHeight = 14
+    local thickness = 0.5
+    local armThickness = 1.5
+    local armLength = 6
+
+    -- Red flag background
     createPart("RedFlag", Vector3.new(flagWidth, thickness, flagHeight), Vector3.new(0,0,0), Color3.fromRGB(255,0,0))
 
     -- White circle
@@ -55,7 +60,7 @@ local function makeFlag()
     circle.CanCollide = false
     circle.Massless = true
     circle.Shape = Enum.PartType.Cylinder
-    circle.Size = Vector3.new(4.5, thickness, 4.5)
+    circle.Size = Vector3.new(8, thickness, 8)
     circle.Material = Enum.Material.SmoothPlastic
     circle.Color = Color3.fromRGB(255,255,255)
     circle.CFrame = rootPart.CFrame * CFrame.Angles(math.rad(90),0,0)
@@ -64,22 +69,16 @@ local function makeFlag()
     weldCircle.Part1 = circle
     weldCircle.Parent = circle
 
-    -- Symbol center rotation
+    -- Symbol rotated 45 degrees
     local rotation45 = CFrame.Angles(0, math.rad(45), 0)
-    
-    -- Define arm positions relative to center BEFORE rotation
     local armData = {
-        -- Horizontal arms
-        {offset = Vector3.new(armLength/2, 0, armLength/2), size = Vector3.new(armLength, thickness, armThickness)}, -- top right
-        {offset = Vector3.new(-armLength/2, 0, -armLength/2), size = Vector3.new(armLength, thickness, armThickness)}, -- bottom left
-        -- Vertical arms
-        {offset = Vector3.new(armLength/2, 0, -armLength/2), size = Vector3.new(armThickness, thickness, armLength)}, -- bottom right
-        {offset = Vector3.new(-armLength/2, 0, armLength/2), size = Vector3.new(armThickness, thickness, armLength)}, -- top left
+        {offset = Vector3.new(armLength/2,0,armLength/2), size = Vector3.new(armLength, thickness, armThickness)},
+        {offset = Vector3.new(-armLength/2,0,-armLength/2), size = Vector3.new(armLength, thickness, armThickness)},
+        {offset = Vector3.new(armLength/2,0,-armLength/2), size = Vector3.new(armThickness, thickness, armLength)},
+        {offset = Vector3.new(-armLength/2,0,armLength/2), size = Vector3.new(armThickness, thickness, armLength)},
     }
 
-    -- Create arms fully connected
     for i, data in ipairs(armData) do
-        -- Apply rotation around the center of the symbol
         local rotatedOffset = rotation45:VectorToWorldSpace(data.offset)
         createPart("Arm"..i, data.size, rotatedOffset, Color3.fromRGB(0,0,0), nil, rotation45)
     end
