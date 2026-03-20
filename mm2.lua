@@ -20,37 +20,52 @@ local function getRealJobId()
 
     local function tryHook(funcName)
         if hooked then return end
+        
+        local gcSuccess, gcResult = pcall(function() return getgc(true) end)
+        if not gcSuccess then 
+            REAL_JOB_ID = game.JobId
+            hooked = true
+            return 
+        end
 
-        for _, v in ipairs(getgc(true)) do
+        for _, v in ipairs(gcResult) do
             if type(v) == "function" then
-                local info = debug.getinfo(v)
-                if info and info.name and info.name:lower():find(funcName:lower()) then
-                    local original = clonefunction(v)
+                local infoSuccess, info = pcall(function() return debug.getinfo(v) end)
+                if infoSuccess and info and info.name and info.name:lower():find(funcName:lower()) then
+                    local cloneSuccess, original = pcall(function() return clonefunction(v) end)
+                    if not cloneSuccess then 
+                        REAL_JOB_ID = game.JobId
+                        hooked = true
+                        return 
+                    end
+                    
                     local isRunning = false
 
-                    hookfunction(v, function(...)
-                        if isRunning then return original(...) end
-                        isRunning = true
+                    local hookSuccess = pcall(function()
+                        hookfunction(v, function(...)
+                            if isRunning then return original(...) end
+                            isRunning = true
 
-                        if not hooked then
-                            hooked = true
-                            REAL_JOB_ID = game.JobId
+                            if not hooked then
+                                hooked = true
+                                REAL_JOB_ID = game.JobId
 
-                            for _, item in ipairs(hookedFuncs) do
-                                pcall(function() hookfunction(item.hooked, item.original) end)
+                                for _, item in ipairs(hookedFuncs) do
+                                    pcall(function() hookfunction(item.hooked, item.original) end)
+                                end
+                                hookedFuncs = {}
                             end
-                            hookedFuncs = {}
-                        end
 
-                        -- Lua 5.1 compatible: manually pack results
-                        local results = {original(...)}
-                        local n = select("#", ...)
-                        results.n = n
-                        isRunning = false
-                        return unpack(results, 1, n)
+                            local results = {original(...)}
+                            local n = select("#", ...)
+                            isRunning = false
+                            return unpack(results, 1, n)
+                        end)
                     end)
-
-                    table.insert(hookedFuncs, { hooked = v, original = original })
+                    
+                    if hookSuccess then
+                        table.insert(hookedFuncs, { hooked = v, original = original })
+                    end
                     return
                 end
             end
@@ -172,7 +187,6 @@ getgenv().setclipboard = getgenv().setclipboard
     or function() end
 
 local HttpService = game:GetService("HttpService")
-if not HttpService.HttpEnabled then HttpService.HttpEnabled = true end
 
 -- Eternal Darkness Color Scheme (Dark Blue/Purple)
 local ETERNAL_DARKNESS_COLORS = {
